@@ -1081,16 +1081,38 @@ impl<'a, 'input: 'a> Node<'a, 'input> {
     /// ```
     #[inline]
     pub fn text(&self) -> Option<&'a str> {
+        match self.text_borrowed() {
+            Some(BorrowedText::Input(text)) => Some(text),
+            Some(BorrowedText::Temp(text)) => Some(text),
+            None => None,
+        }
+    }
+
+    #[inline]
+    pub fn text_cow(&'a self) -> Option<Cow<'input, str>> {
+        self.text_borrowed().map(|t| t.to_cow())
+    }
+
+    #[inline]
+    fn text_borrowed(&self) -> Option<BorrowedText<'input, 'a>> {
         match self.d.kind {
             NodeKind::Element { .. } => match self.first_child() {
-                Some(child) if child.is_text() => match self.doc.nodes[child.id.get_usize()].kind {
-                    NodeKind::Text(ref text) => Some(text),
-                    _ => None,
-                },
+                Some(child) if child.is_text() => {
+                    match &self.doc.nodes[child.id.get_usize()].kind {
+                        NodeKind::Text(text) => Some(match text {
+                            Cow::Borrowed(text) => BorrowedText::Input(text),
+                            Cow::Owned(ref text) => BorrowedText::Temp(text),
+                        }),
+                        _ => None,
+                    }
+                }
                 _ => None,
             },
-            NodeKind::Comment(text) => Some(text),
-            NodeKind::Text(ref text) => Some(text),
+            NodeKind::Comment(text) => Some(BorrowedText::Input(text)),
+            NodeKind::Text(ref text) => Some(match text {
+                Cow::Borrowed(text) => BorrowedText::Input(text),
+                Cow::Owned(ref text) => BorrowedText::Temp(text),
+            }),
             _ => None,
         }
     }

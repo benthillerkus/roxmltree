@@ -283,3 +283,15 @@ fn tag_name_lifetime() {
     let root = doc.root_element();
     assert_eq!(get_tag_name(&root), "e");
 }
+
+#[test]
+fn cow() {
+    static DATA: &str = "<root>hello</root>";
+    let doc = roxmltree::Document::parse(DATA).unwrap();
+    let text = doc.root().first_child().unwrap().text_cow().unwrap();
+
+    drop(doc);
+
+    assert_eq!(text, "hello");
+    assert!(matches!(text, std::borrow::Cow::Borrowed(_)));
+}
